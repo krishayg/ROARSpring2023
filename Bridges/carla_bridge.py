@@ -167,7 +167,7 @@ class CarlaBridge(Bridge):
             throttle=abs(control.throttle),
             steer=control.steering,
             brake=control.brake,
-            hand_brake=False,
+            hand_brake=control.hand_brake,
             reverse=True if control.throttle < 0 else False,
             manual_gear_shift=True,
             gear=control.gear

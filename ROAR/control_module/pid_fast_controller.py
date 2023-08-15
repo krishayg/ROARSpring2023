@@ -110,7 +110,7 @@ class PIDFastController(Controller):
         # if keyboard.is_pressed("space"):
         #      print(self.agent.vehicle.transform.record())
         
-        return VehicleControl(throttle=throttle, steering=steering, brake=brake, gear=gear)
+        return VehicleControl(throttle=throttle, steering=steering, brake=brake, gear=gear,hand_brake=0)
 
     @staticmethod
     def find_k_values(vehicle: Vehicle, config: dict) -> np.array:
@@ -121,6 +121,15 @@ class PIDFastController(Controller):
             if current_speed < speed_upper_bound:
                 k_p, k_d, k_i = kvalues["Kp"], kvalues["Kd"], kvalues["Ki"]
                 break
+        return np.array([k_p, k_d, k_i])
+    def find_k_values_formula(vehicle: Vehicle, config: dict) -> np.array:
+        #uses a sigmoid function to calculate k values
+        e=2.71828
+        current_speed = Vehicle.get_speed(vehicle=vehicle)
+        k_p=-0.0225343+(0.6858377+0.0225343)/(1+(current_speed/160.9069)**5.880651)#min(1,1.8*(1-(1/(1+e**(current_speed*-1/100)))))
+        k_d=-0.01573431+(0.2335526+0.01573431)/(1+(current_speed/113.8959)**3.660237)#1*(1-(1/(1+e**(current_speed*-1/100))))
+        k_i=0.01
+        #print(k_p,k_d,k_i)
         return np.array([k_p, k_d, k_i])
 
 class LatPIDController(Controller):
@@ -200,9 +209,11 @@ class LatPIDController(Controller):
             _de = 0.0
             _ie = 0.0
 
-        k_p, k_d, k_i = PIDFastController.find_k_values(config=self.config, vehicle=self.agent.vehicle)
+        k_p, k_d,_= PIDFastController.find_k_values_formula(config=self.config, vehicle=self.agent.vehicle)
+        _,_,k_i=PIDFastController.find_k_values(config=self.config, vehicle=self.agent.vehicle)
 
         lat_control = float(
             np.clip((k_p * error) + (k_d * _de) + (k_i * _ie), self.steering_boundary[0], self.steering_boundary[1])
         )
         return lat_control, error, wide_error, sharp_error
+    

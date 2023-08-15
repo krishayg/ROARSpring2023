@@ -10,6 +10,7 @@ class VehicleControl(BaseModel):
     steering: float = Field(default=0)
     brake: float = Field(default=0)
     gear: int = Field(default=1)
+    hand_brake: int=Field(default=0)
 
     @staticmethod
     def clamp(n, minn, maxn):
