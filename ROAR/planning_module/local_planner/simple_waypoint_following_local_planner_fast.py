@@ -45,6 +45,7 @@ class SimpleWaypointFollowingLocalPlanner(LocalPlanner):
         self.closeness_threshold = closeness_threshold
         self.closeness_threshold_config = json.load(Path(
             agent.agent_settings.simple_waypoint_local_planner_config_file_path).open(mode='r'))
+        self.prevpt=None
 
     def set_mission_plan(self) -> None:
         """
@@ -126,7 +127,7 @@ class SimpleWaypointFollowingLocalPlanner(LocalPlanner):
                 curr_closest_dist = curr_dist
             elif curr_dist < self.closeness_threshold:
                 # i have moved onto a waypoint, remove that waypoint from the queue
-                self.way_points_queue.popleft()
+                self.prevpt=self.way_points_queue.popleft()
             else:
                 break
         current_speed = Vehicle.get_speed(self.agent.vehicle)
@@ -143,7 +144,7 @@ class SimpleWaypointFollowingLocalPlanner(LocalPlanner):
         far_waypoint = self.way_points_queue[waypoint_lookahead]
         close_waypoint = self.way_points_queue[min(120, waypoint_lookahead)]
         
-        control: VehicleControl = self.controller.run_in_series(next_waypoint=target_waypoint, close_waypoint=close_waypoint, far_waypoint=far_waypoint)
+        control: VehicleControl = self.controller.run_in_series(previous_waypoint=self.prevpt,next_waypoint=target_waypoint, close_waypoint=close_waypoint, far_waypoint=far_waypoint)
         # self.logger.debug(f"\n"
         #                   f"Curr Transform: {self.agent.vehicle.transform}\n"
         #                   f"Target Location: {target_waypoint.location}\n"

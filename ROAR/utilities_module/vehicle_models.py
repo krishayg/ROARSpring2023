@@ -55,7 +55,7 @@ class Vehicle(BaseModel):
     acceleration: Optional[Vector3D] = Field(default=Vector3D(x=0, y=0, z=0))
     control: VehicleControl = Field(default=VehicleControl())  # ?
     wheel_base: float = Field(
-        default=2.875,
+        default=2.6,#2.875, #KG
         title="Wheel Base length of the vehilce in meters",
         description="Default to tesla model 3's wheel base",
     )

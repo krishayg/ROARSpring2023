@@ -48,6 +48,16 @@ class PIDController(Controller):
                 k_p, k_d, k_i = kvalues["Kp"], kvalues["Kd"], kvalues["Ki"]
                 break
         return np.array([k_p, k_d, k_i])
+    @staticmethod
+    def find_k_values_formula(vehicle: Vehicle, config: dict) -> np.array:
+        #uses a sigmoid function to calculate k values
+        e=2.71828
+        current_speed = Vehicle.get_speed(vehicle=vehicle)
+        k_p=min(1,2.5*(1-(1/(1+e**(current_speed*-1/100)))))
+        k_d=1.2*(1-(1/(1+e**(current_speed*-1/100))))
+        k_i=0.001
+        print(k_p,k_d,k_i)
+        return np.array([k_p, k_d, k_i])
 
 
 class LongPIDController(Controller):
