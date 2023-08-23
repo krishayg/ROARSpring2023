@@ -14,6 +14,7 @@ from ROAR.utilities_module.errors import (
 from ROAR.agent_module.agent import Agent
 import json
 from pathlib import Path
+import json
 
 
 class SimpleWaypointFollowingLocalPlanner(LocalPlanner):
@@ -65,7 +66,12 @@ class SimpleWaypointFollowingLocalPlanner(LocalPlanner):
         # set waypoint queue to current spawn location
         # 1. find closest waypoint
         # 2. remove all waypoints prior to closest waypoint
-        if False:
+
+        with open('ROAR\\configurations\\carla\\carla_agent_configuration.json', 'r') as file:
+            carla_agent_config = json.load(file)
+
+        starting_point = carla_agent_config['spawn_point_id']
+        if starting_point>0:
             closest_waypoint = self.way_points_queue[0]
             for waypoint in self.way_points_queue:
                 cur_dist = self.agent.vehicle.transform.location.distance(waypoint.location)
@@ -142,9 +148,11 @@ class SimpleWaypointFollowingLocalPlanner(LocalPlanner):
 
         waypoint_lookahead = round(pow(current_speed, 2)*0.002 + 0.7*current_speed)
         far_waypoint = self.way_points_queue[waypoint_lookahead]
-        close_waypoint = self.way_points_queue[min(120, waypoint_lookahead)]
+        close_waypoint = self.way_points_queue[min(120, waypoint_lookahead)] ################CHANGE
+        close_waypoint_track=self.way_points_queue[max(150,waypoint_lookahead)]
+        close_waypoint_next=self.way_points_queue[max(151,waypoint_lookahead+1)]
         
-        control: VehicleControl = self.controller.run_in_series(previous_waypoint=self.prevpt,next_waypoint=target_waypoint, close_waypoint=close_waypoint, far_waypoint=far_waypoint)
+        control: VehicleControl = self.controller.run_in_series(previous_waypoint=self.prevpt,next_waypoint=target_waypoint, close_waypoint=close_waypoint,close_waypoint_track=close_waypoint_track, far_waypoint=far_waypoint,close_waypoint_next=close_waypoint_next)
         # self.logger.debug(f"\n"
         #                   f"Curr Transform: {self.agent.vehicle.transform}\n"
         #                   f"Target Location: {target_waypoint.location}\n"
