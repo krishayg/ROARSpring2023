@@ -59,6 +59,8 @@ class PIDFastController(Controller):
                     print("DELETING")
                     self.waypoint_queue_region.pop(0)
         self.waypoint_queue_braking = []
+        self.waypoint_queue_shifting=[]
+
         with open("ROAR\\control_module\\braking_list_mod.txt") as f:
             for line in f:
                 raw = line.split(",")
@@ -75,7 +77,7 @@ class PIDFastController(Controller):
                 while self.waypoint_queue_braking[0] != closest_waypoint:
                     print("DELETING")
                     self.waypoint_queue_braking.pop(0)
-            print(len(self.waypoint_queue_braking))
+            #print(len(self.waypoint_queue_braking))
             while starting_point>=10 and len(self.waypoint_queue_braking)>2:
                 print(len(self.waypoint_queue_braking))
                 self.waypoint_queue_braking.pop(0)
@@ -96,6 +98,11 @@ class PIDFastController(Controller):
                 for i in range(4):
                     self.waypoint_queue_turning.pop(0)
                 self.turn_number=4
+            with open("ROAR\\control_module\\waypoint_shift_list.txt") as f:
+                for line in f:
+                    raw = line.split(",")
+                    waypoint = Transform(location=Location(x=raw[0], y=raw[1], z=raw[2]), rotation=Rotation(pitch=0, yaw=0, roll=0))
+                    self.waypoint_queue_shifting.append(waypoint)
         self.lat_pid_controller = LatPIDController(
             agent=agent,
             config=self.config["latitudinal_controller"],
@@ -111,9 +118,14 @@ class PIDFastController(Controller):
             previous_waypoint=next_waypoint
             
         current_speed = Vehicle.get_speed(self.agent.vehicle)
-
+        waypoint=self.waypoint_queue_shifting[0]
+        dist = self.agent.vehicle.transform.location.distance(waypoint.location)
+        shift_manual=0
+        if dist<=5:
+            self.waypoint_queue_shifting.pop(0)
+            shift_manual=0
         # run lat pid controller
-        steering, error, wide_error, sharp_error,track_error = self.lat_pid_controller.run_in_series(current_speed=current_speed,region=self.region, previous_waypoint=previous_waypoint,next_waypoint=next_waypoint, close_waypoint=close_waypoint, far_waypoint=far_waypoint,close_waypoint_next=close_waypoint_next,close_waypoint_track=close_waypoint_track,turn_number=self.turn_number)
+        steering, error, wide_error, sharp_error,track_error = self.lat_pid_controller.run_in_series(shift_manual=shift_manual,current_speed=current_speed,region=self.region, previous_waypoint=previous_waypoint,next_waypoint=next_waypoint, close_waypoint=close_waypoint, far_waypoint=far_waypoint,close_waypoint_next=close_waypoint_next,close_waypoint_track=close_waypoint_track,turn_number=self.turn_number)
         
         self.lane_detector =LaneDetector(agent=self.agent)
         #print(self.lane_detector.run_in_series())
@@ -153,6 +165,7 @@ class PIDFastController(Controller):
         elif self.turn_number==6:
             sharp_error_threshold=0.63
             speed_threshold=75
+        #print(len(self.waypoint_queue_braking))
         if self.region ==1:
             #if sharp_error < sharp_error_threshold or current_speed <= speed_threshold:#0.68
             if sharp_error < sharp_error_threshold or current_speed <= speed_threshold:#0.68
@@ -208,11 +221,12 @@ class PIDFastController(Controller):
             elif wide_error > 0.09 and current_speed > 92: # wide turn  #originally 0.09,92
                 #print(wide_error/track_error)
                 #throttle = max(0, 1 - 6*pow(track_error*0.27+wide_error*0.53 + current_speed*0.0027, 6))
-                throttle = max(0, 1 - 6*pow(wide_error*0.92 + current_speed*0.00274, 6))
+                throttle = max(0, 1 - 6*pow(wide_error*0.9 + current_speed*0.00256, 6)) #0.92 and 0.00274 #0.00264 works
                 brake = 0
             else:
                 throttle = 1
                 brake = 0
+
         elif self.region==4:
             waypoint = self.waypoint_queue_braking[0][0] # 5012 is weird bump spot
             dist = self.agent.vehicle.transform.location.distance(waypoint.location)
@@ -246,7 +260,6 @@ class PIDFastController(Controller):
                 brake = 1
                 hand_brake=1
         #print(self.turn_number)
-        print(len(self.waypoint_queue_braking))
         gear = max(1, (int)((current_speed - 2*pitch) / 60))
         if throttle == -1:
             gear = -1
@@ -388,7 +401,7 @@ class LatPIDController(Controller):
         #print(track_error)
         cross=np.cross(cur_waypoints_vec,next_waypoints_vec)
         return error,sharp_error,wide_error,cross,track_error
-    def run_in_series(self, current_speed,region,turn_number,previous_waypoint:Transform, next_waypoint: Transform, close_waypoint: Transform, far_waypoint: Transform,close_waypoint_next:Transform, close_waypoint_track:Transform,**kwargs) -> float:
+    def run_in_series(self, shift_manual,current_speed,region,turn_number,previous_waypoint:Transform, next_waypoint: Transform, close_waypoint: Transform, far_waypoint: Transform,close_waypoint_next:Transform, close_waypoint_track:Transform,**kwargs) -> float:
         """
         Calculates a vector that represent where you are going.
         Args:
@@ -453,17 +466,18 @@ class LatPIDController(Controller):
         toshiftstart=int((0.9*round(pow(current_speed, 2)*0.002 + 0.7*current_speed)))
         #print(turn_number)
         if region==2 or turn_number!=5:
-            max_shift=max(3,1/(current_speed+1e-16)*175) #originally 1
+            max_shift=max(2.5,1/(current_speed+1e-16)*225) #3.0,175 #originally 1
         elif turn_number==5:
             max_shift=1.5#max(2,1/(current_speed+1e-16)*60)
         else:
             max_shift=0
         #print(sharp_error,wide_error,region,self.to_shift)
-        if (track_error>=0.7) and region in [2,3] and self.to_shift==0:
+        #print(shift_manual)
+        if ((track_error>=0.75) and region in [2,3] and self.to_shift==0) or shift_manual: #originally 0.7
             print("HERE")
             if self.to_shift==0:
                 self.track_error_start=track_error
-                self.after_shift=10
+                self.after_shift=10 #10
                 self.max_shift_saved=max_shift
                 self.toshiftstart_saved=toshiftstart+1e-10
                 self.to_shift=int(toshiftstart)
@@ -519,8 +533,8 @@ class LatPIDController(Controller):
             _,_,k_i=PIDFastController.find_k_values(config=self.config, vehicle=self.agent.vehicle)
         if self.to_shift>0 and self.to_shift<self.toshiftstart_saved:
            # print(self.track_error_start)
-            k_p*=1.6#self.track_error_start*2
-            k_d=k_d/2.6#(self.track_error_start*2)
+            k_p*=1.6 #1.65          #self.track_error_start*2
+            k_d=k_d/2.6        #(self.track_error_start*2)
             #k_i=0
         elif self.to_shift==0 and self.after_shift>0:
             k_p=k_p/2#(self.track_error_start*3)

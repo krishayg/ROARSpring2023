@@ -148,7 +148,7 @@ class SimpleWaypointFollowingLocalPlanner(LocalPlanner):
 
         waypoint_lookahead = round(pow(current_speed, 2)*0.002 + 0.7*current_speed)
         far_waypoint = self.way_points_queue[waypoint_lookahead]
-        close_waypoint = self.way_points_queue[min(120, waypoint_lookahead)] ################CHANGE
+        close_waypoint = self.way_points_queue[min(120, waypoint_lookahead)] 
         close_waypoint_track=self.way_points_queue[max(150,waypoint_lookahead)]
         close_waypoint_next=self.way_points_queue[max(151,waypoint_lookahead+1)]
         
