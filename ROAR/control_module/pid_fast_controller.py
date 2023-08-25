@@ -103,12 +103,23 @@ class PIDFastController(Controller):
                     raw = line.split(",")
                     waypoint = Transform(location=Location(x=raw[0], y=raw[1], z=raw[2]), rotation=Rotation(pitch=0, yaw=0, roll=0))
                     self.waypoint_queue_shifting.append(waypoint)
+        self.waypoint_queue_sub_region=[]
+        with open("ROAR\\control_module\\sub_region_list.txt") as f:
+            for line in f:
+                raw = line.split(",")
+                waypoint = Transform(location=Location(x=raw[0], y=raw[1], z=raw[2]), rotation=Rotation(pitch=0, yaw=0, roll=0))
+                self.waypoint_queue_sub_region.append(waypoint)
         self.lat_pid_controller = LatPIDController(
             agent=agent,
             config=self.config["latitudinal_controller"],
             steering_boundary=steering_boundary
         )
         self.logger = logging.getLogger(__name__)
+        if starting_point>=6:
+            self.sub_region=1
+            self.waypoint_queue_sub_region.pop(0)
+        else:
+            self.sub_region=0
 
     def run_in_series(self, previous_waypoint,next_waypoint: Transform, close_waypoint: Transform, far_waypoint: Transform, close_waypoint_next:Transform,close_waypoint_track:Transform,**kwargs) -> VehicleControl:
         if previous_waypoint:
@@ -121,9 +132,17 @@ class PIDFastController(Controller):
         waypoint=self.waypoint_queue_shifting[0]
         dist = self.agent.vehicle.transform.location.distance(waypoint.location)
         shift_manual=0
+        #print(dist)
         if dist<=5:
             self.waypoint_queue_shifting.pop(0)
-            shift_manual=0
+            shift_manual=1
+        
+        waypoint=self.waypoint_queue_sub_region[0]
+        dist = self.agent.vehicle.transform.location.distance(waypoint.location)
+        if dist<=5:
+            print("SWITCHING SUBREGION")
+            self.waypoint_queue_sub_region.pop(0)
+            self.sub_region+=1
         # run lat pid controller
         steering, error, wide_error, sharp_error,track_error = self.lat_pid_controller.run_in_series(shift_manual=shift_manual,current_speed=current_speed,region=self.region, previous_waypoint=previous_waypoint,next_waypoint=next_waypoint, close_waypoint=close_waypoint, far_waypoint=far_waypoint,close_waypoint_next=close_waypoint_next,close_waypoint_track=close_waypoint_track,turn_number=self.turn_number)
         
@@ -217,11 +236,22 @@ class PIDFastController(Controller):
                     self.brake_counter = 0
             elif sharp_error >= 0.67 and current_speed > 81: #originally 0.65, 80
                 throttle = 0
-                brake =current_speed/400#0.4
-            elif wide_error > 0.09 and current_speed > 92: # wide turn  #originally 0.09,92
+                brake =current_speed/400
+            elif wide_error > 0.09 and current_speed > 95: # wide turn  #originally 0.09,92
                 #print(wide_error/track_error)
                 #throttle = max(0, 1 - 6*pow(track_error*0.27+wide_error*0.53 + current_speed*0.0027, 6))
-                throttle = max(0, 1 - 6*pow(wide_error*0.9 + current_speed*0.00256, 6)) #0.92 and 0.00274 #0.00264 works
+                speed_multiplier=0.00256
+                if self.sub_region in [0,2]:
+                    speed_multiplier=0.00262
+                elif self.sub_region==1:
+                    speed_multiplier=0.0024
+                if self.sub_region==3:
+                    speed_multiplier=0.0024
+                elif self.sub_region==4:
+                    speed_multiplier=0.0027
+                elif self.sub_region==5:
+                    speed_multiplier=0.0023
+                throttle = max(0, 1 - 6*pow(wide_error*0.9 + current_speed*speed_multiplier, 6)) #0.92 and 0.00274 #0.00264 works #0.00256
                 brake = 0
             else:
                 throttle = 1
