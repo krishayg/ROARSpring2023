@@ -144,7 +144,7 @@ class PIDFastController(Controller):
             self.waypoint_queue_sub_region.pop(0)
             self.sub_region+=1
         # run lat pid controller
-        steering, error, wide_error, sharp_error,track_error = self.lat_pid_controller.run_in_series(shift_manual=shift_manual,current_speed=current_speed,region=self.region, previous_waypoint=previous_waypoint,next_waypoint=next_waypoint, close_waypoint=close_waypoint, far_waypoint=far_waypoint,close_waypoint_next=close_waypoint_next,close_waypoint_track=close_waypoint_track,turn_number=self.turn_number)
+        steering, error, wide_error, sharp_error,track_error = self.lat_pid_controller.run_in_series(sub_region=self.sub_region,shift_manual=shift_manual,current_speed=current_speed,region=self.region, previous_waypoint=previous_waypoint,next_waypoint=next_waypoint, close_waypoint=close_waypoint, far_waypoint=far_waypoint,close_waypoint_next=close_waypoint_next,close_waypoint_track=close_waypoint_track,turn_number=self.turn_number)
         
         self.lane_detector =LaneDetector(agent=self.agent)
         #print(self.lane_detector.run_in_series())
@@ -242,13 +242,13 @@ class PIDFastController(Controller):
                 #throttle = max(0, 1 - 6*pow(track_error*0.27+wide_error*0.53 + current_speed*0.0027, 6))
                 speed_multiplier=0.00256
                 if self.sub_region in [0,2]:
-                    speed_multiplier=0.00262
+                    speed_multiplier=0.00258
                 elif self.sub_region==1:
-                    speed_multiplier=0.0024
+                    speed_multiplier=0.00225
                 if self.sub_region==3:
-                    speed_multiplier=0.0024
+                    speed_multiplier=0.00233
                 elif self.sub_region==4:
-                    speed_multiplier=0.0027
+                    speed_multiplier=0.0025
                 elif self.sub_region==5:
                     speed_multiplier=0.0023
                 throttle = max(0, 1 - 6*pow(wide_error*0.9 + current_speed*speed_multiplier, 6)) #0.92 and 0.00274 #0.00264 works #0.00256
@@ -431,7 +431,7 @@ class LatPIDController(Controller):
         #print(track_error)
         cross=np.cross(cur_waypoints_vec,next_waypoints_vec)
         return error,sharp_error,wide_error,cross,track_error
-    def run_in_series(self, shift_manual,current_speed,region,turn_number,previous_waypoint:Transform, next_waypoint: Transform, close_waypoint: Transform, far_waypoint: Transform,close_waypoint_next:Transform, close_waypoint_track:Transform,**kwargs) -> float:
+    def run_in_series(self, sub_region,shift_manual,current_speed,region,turn_number,previous_waypoint:Transform, next_waypoint: Transform, close_waypoint: Transform, far_waypoint: Transform,close_waypoint_next:Transform, close_waypoint_track:Transform,**kwargs) -> float:
         """
         Calculates a vector that represent where you are going.
         Args:
@@ -563,9 +563,13 @@ class LatPIDController(Controller):
             _,_,k_i=PIDFastController.find_k_values(config=self.config, vehicle=self.agent.vehicle)
         if self.to_shift>0 and self.to_shift<self.toshiftstart_saved:
            # print(self.track_error_start)
-            k_p*=1.6 #1.65          #self.track_error_start*2
-            k_d=k_d/2.6        #(self.track_error_start*2)
-            #k_i=0
+           if sub_region not in [2,5]:
+                k_p*=2 #1.65          #self.track_error_start*2
+                k_d=k_d/2        #(self.track_error_start*2)
+                #k_i=0
+           else:
+                k_p*=1.6         #self.track_error_start*2
+                k_d=k_d/2.6   
         elif self.to_shift==0 and self.after_shift>0:
             k_p=k_p/2#(self.track_error_start*3)
             self.after_shift-=1
