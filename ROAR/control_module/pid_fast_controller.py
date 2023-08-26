@@ -242,7 +242,7 @@ class PIDFastController(Controller):
                 #throttle = max(0, 1 - 6*pow(track_error*0.27+wide_error*0.53 + current_speed*0.0027, 6))
                 speed_multiplier=0.00256
                 if self.sub_region in [0,2]:
-                    speed_multiplier=0.00258
+                    speed_multiplier=0.00256
                 elif self.sub_region==1:
                     speed_multiplier=0.00225
                 if self.sub_region==3:
@@ -250,7 +250,7 @@ class PIDFastController(Controller):
                 elif self.sub_region==4:
                     speed_multiplier=0.0025
                 elif self.sub_region==5:
-                    speed_multiplier=0.0023
+                    speed_multiplier=0.00232
                 throttle = max(0, 1 - 6*pow(wide_error*0.9 + current_speed*speed_multiplier, 6)) #0.92 and 0.00274 #0.00264 works #0.00256
                 brake = 0
             else:
